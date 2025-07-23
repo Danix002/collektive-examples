@@ -2,17 +2,17 @@ incarnation: collektive
 
 network-model:
   type: ConnectWithinDistance
-  parameters: [5]
+  parameters: [2]
 
 _pool: &program
   - time-distribution: 1
     type: Event
     actions:
       - type: RunCollektiveProgram
-        parameters: [it.unibo.collektive.examples.branching.BranchingKt.branchingEntrypoint]
+        parameters: [it.unibo.collektive.examples.diameter.NetworkDiameterKt.networkDiameter]
 
 deployments:
-  - type: Rectangle
-    parameters: [100, 0, 0, 20, 20]
+  - type: GraphStreamDeployment
+    parameters: [15, 2, 0, PreferentialAttachment]
     programs:
       - *program

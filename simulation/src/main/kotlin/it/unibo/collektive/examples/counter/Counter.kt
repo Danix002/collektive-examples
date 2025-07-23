@@ -46,19 +46,14 @@ fun Aggregate<Int>.broadcastCountDevicesWithLeaderElectionEntrypoint(
     collektiveDevice: CollektiveDevice<*>,
     env: EnvironmentVariables,
 ): Int {
-    val leaderId = findLeader(env)
+    val isLeader = (findLeader() == localId).also { env["isSource"] = it }
     return broadcastCountDevices(
         distances = with(collektiveDevice) { distances() },
-        source = localId == leaderId,
+        source = isLeader,
     )
 }
 
 /**
- * Elects a leader in the network of devices within a bounded space relative to the simulation environment [env].
- * Lower values of [bound] will result in a more localized election,
- * while higher values will allow for a more global election.
+ * Elects a leader in the network of devices within a bounded space.
  */
-fun Aggregate<Int>.findLeader(env: EnvironmentVariables): Int = boundedElection(bound = 25).also {
-    env["leader"] = it
-    env["isSource"] = localId == it
-}
+fun Aggregate<Int>.findLeader(): Int = boundedElection(bound = 25)
