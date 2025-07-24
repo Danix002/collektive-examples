@@ -85,6 +85,6 @@ fun Aggregate<Int>.saveNewMessage(
         }
     }.toMap()
     .mapValues { (key, list) ->
-        list.filter { it.isSourceValues }
+        list.filter { it.isSourceValues && it.distance <= it.distanceForMessaging}
     }
 }
