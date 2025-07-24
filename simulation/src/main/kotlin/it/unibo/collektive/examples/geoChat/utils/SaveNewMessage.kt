@@ -85,6 +85,6 @@ fun Aggregate<Int>.saveNewMessage(
         }
     }.toMap()
     .mapValues { (key, list) ->
-        list.filter { it.isSourceValues && it.to == key}
+        list.filter { it.isSourceValues }
     }
 }
