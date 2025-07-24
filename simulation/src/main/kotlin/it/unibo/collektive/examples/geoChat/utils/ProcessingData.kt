@@ -31,8 +31,15 @@ import it.unibo.collektive.aggregate.api.mapNeighborhood
  */
 fun Aggregate<Int>.getListOfDevicesValues(
     senders: Map<Int, Triple<Float, String, Int>>
-): Map<Int, Float> =
-    mapNeighborhood { id ->
+): Map<Int, Float> {
+    val neighborhoodMap = mapNeighborhood { id ->
         senders[id]?.first ?: POSITIVE_INFINITY
     }.toMap()
+    val combined = mutableMapOf<Int, Float>()
+    for ((id, triple) in senders) {
+        combined[id] = triple.first
+    }
+    combined.putAll(neighborhoodMap)
+    return combined
+}
 

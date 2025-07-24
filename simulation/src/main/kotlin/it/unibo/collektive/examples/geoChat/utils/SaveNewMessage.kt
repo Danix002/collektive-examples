@@ -84,7 +84,6 @@ fun Aggregate<Int>.saveNewMessage(
             )
         }
     }.toMap()
-    .filterKeys { senders.containsKey(it) && it != localId }
     .mapValues { (key, list) ->
         list.filter { it.isSourceValues && it.to == key}
     }
