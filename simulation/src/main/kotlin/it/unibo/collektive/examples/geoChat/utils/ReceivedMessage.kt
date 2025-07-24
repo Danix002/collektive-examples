@@ -3,6 +3,8 @@ package it.unibo.collektive.examples.geoChat.utils
 import it.unibo.collektive.aggregate.api.Aggregate
 import it.unibo.collektive.aggregate.api.mapNeighborhood
 
+data class MessageKey(val senderId: Int, val emission: Int)
+
 /**
  * Processes a map of senders and their distances to produce a list of messages
  * that the current node has received or should consider.

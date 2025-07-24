@@ -6,6 +6,8 @@ import it.unibo.collektive.stdlib.util.Point3D
 import it.unibo.alchemist.model.Environment
 import it.unibo.alchemist.model.Node
 import it.unibo.alchemist.model.Position
+import it.unibo.collektive.aggregate.api.neighboring
+import it.unibo.collektive.examples.geoChat.utils.MessageKey
 import it.unibo.collektive.examples.geoChat.utils.getListOfDevicesValues
 import it.unibo.collektive.examples.geoChat.utils.saveNewMessage
 import it.unibo.collektive.examples.geoChat.utils.receivedMessageList
@@ -52,57 +54,116 @@ fun <P : Position<P>> generateRandomPoint3D(
 fun isSource() = Random.nextFloat() < 0.25f
 
 /**
- * Entry point for a geo-aware chat simulation in the aggregate network.
+ * Entry point for a geospatial, aggregate-based chat simulation.
  *
- * Each device determines whether it is a message source, generates a random position,
- * and sets an initial message and propagation distance if it is a source.
- * Then, it spreads the intention to send a message through the network using
- * the [spreadIntentionToSendMessage] gradient-based method.
+ * This function governs the behavior of each node in the network, allowing it to probabilistically
+ * act as a source of geolocated messages and to receive messages disseminated by neighboring nodes.
  *
- * The function collects messages from senders within range, saves new messages,
- * and filters the received messages to determine which ones should be accepted
- * by the current device.
+ * The simulation proceeds in discrete rounds, during which each device:
+ * - Determines probabilistically whether it becomes a message source, with a cooldown mechanism
+ *   enforcing alternation between source and non-source phases.
+ * - If a source, generates a message with an associated transmission radius.
+ * - Propagates its message intent via a gradient mechanism across the spatial network.
+ * - Receives messages from nearby sources whose gradient has reached the node.
+ * - Updates persistent state with any newly received messages, preserving message history
+ *   across simulation rounds.
  *
- * @param simulatedDevice The device running this aggregate program, containing its environment and node info.
+ * @param simulatedDevice The [CollektiveDevice] executing this aggregate program.
+ *                        Encapsulates environment context, node identity, and persistent state.
  *
- * @return A map of device IDs to pairs of accumulated distance and message string,
- * filtered to only include devices from which messages are actually received.
+ * @return The number of unique messages received by the device up to the current simulation time.
+ *
+ * @implNote
+ * A node that becomes a message source retains this role for a minimum of 30 seconds,
+ * after which it is prevented from becoming a source again for another 30 seconds.
+ *
+ * Messages are associated with a unique emission counter (`sourceCounter`) that is incremented
+ * upon each emission. This mechanism ensures that distinct messages from the same source node
+ * are uniquely identifiable and persistently recorded using [MessageKey].
+ *
+ * Only messages with an emission counter strictly greater than zero are stored and visualized.
+ * The complete history of received messages is maintained in `messagesReceived` (for uniqueness)
+ * and `messageHistory` (to preserve temporal reception order).
  */
 fun Aggregate<Int>.geoChatEntrypoint(
     simulatedDevice: CollektiveDevice<*>,
-): Map<Int, Pair<Float, String>> {
-    //============ SETUP
-    var distance = POSITIVE_INFINITY; var message = ""; var senders = emptyMap<Int, Pair<Float, String>>()
+): Int {
+    //============ Setup
+    var distance = POSITIVE_INFINITY; var message = ""; var senders = emptyMap<Int, Triple<Float, String, Int>>(); var sourceCounter = 0;
     val position = generateRandomPoint3D(simulatedDevice.environment, simulatedDevice.node)
-    val isSource = isSource()
-    if (isSource) {
-        simulatedDevice["isSource"] = true
-        distance = Random.nextInt(5, 20).toFloat()
-        message = "Hello! I'm device $localId"
-    }else{
-        simulatedDevice["isSource"] = false
+    val now = System.currentTimeMillis()
+    val lastAttempt = simulatedDevice["lastAttempt"] as? Long ?: 0L
+    val lastSourceStart = simulatedDevice["sourceSince"] as? Long ?: -1L
+    val wasSource = simulatedDevice["isSource"] as? Boolean ?: false
+    val inCooldown = now - lastAttempt < 30_000
+    val isSource = when {
+        wasSource && (now - lastSourceStart < 30_000) -> true
+        !inCooldown && isSource() -> {
+            val msg = "Hello! I'm device $localId"
+            val dist = Random.nextInt(5, 20).toFloat()
+            sourceCounter = (simulatedDevice["sourceCounter"] as? Int ?: 0) + 1
+            simulatedDevice["sourceCounter"] = sourceCounter
+            simulatedDevice["isSource"] = true
+            simulatedDevice["sourceSince"] = now
+            simulatedDevice["message"] = msg
+            simulatedDevice["distance"] = dist
+            simulatedDevice["lastAttempt"] = now
+            true
+        }
+        else -> {
+            simulatedDevice["isSource"] = false
+            if (!inCooldown) {
+                simulatedDevice["lastAttempt"] = now
+            }
+            false
+        }
     }
-
-    //============ SEND MESSAGE
+    if (isSource) {
+        message = simulatedDevice["message"] as String
+        distance = simulatedDevice["distance"] as Float
+    }
+    //============ Send messages
     val sender = spreadIntentionToSendMessage(
         isSender = isSource,
         deviceId = localId,
         distance = distance,
         position = position,
-        message = message
+        message = message,
+        sourceCounter = sourceCounter
     )
-
-    //============ RECEIVE AND SAVE MESSAGE
+    //============ Receive messages
     if(sender.second.first != POSITIVE_INFINITY){
         val tmp = senders.toMutableMap()
-        tmp.put(sender.first, sender.second)
+        val allSender = neighboring(sender).toMap()
+        tmp.putAll(allSender.values)
         senders = tmp
     }
-    val newMessage = saveNewMessage(getListOfDevicesValues(senders), position, senders)
-
-    //============ VISUALIZE MESSAGE
-    val messagesToReceive = receivedMessageList(newMessage)
-    return senders.filterKeys {
-        messagesToReceive.values.flatten().contains(it to true)
+    val newMessages = saveNewMessage(getListOfDevicesValues(senders), position, senders)
+    //============ Save messages
+    val messageKeys = receivedMessageList(newMessages)
+    val receivedMessages = (
+        simulatedDevice["messagesReceived"] as? MutableMap<MessageKey, Pair<Float, String>>
+            ?: mutableMapOf()
+        ).toMutableMap()
+    val ordered = (
+        simulatedDevice["messageHistory"] as? MutableList<Pair<MessageKey, String>>
+            ?: mutableListOf()
+        ).toMutableList()
+    for ((senderId, list) in messageKeys) {
+        for ((key, received) in list) {
+            if (received) {
+                val triple = senders[key] ?: continue
+                val (dist, content, counter) = triple
+                val mKey = MessageKey(senderId = key, emission = counter)
+                if (counter > 0 && !receivedMessages.containsKey(mKey)) {
+                    receivedMessages[mKey] = dist to content
+                    ordered += mKey to content
+                }
+            }
+        }
     }
+
+    simulatedDevice["messagesReceived"] = receivedMessages
+    simulatedDevice["messageHistory"] = ordered
+    return receivedMessages.size
 }

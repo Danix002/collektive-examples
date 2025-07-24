@@ -17,7 +17,7 @@ data class SourceDistances(
     /**
      * Contains the id of the non-source node being considered.
     */
-    val from: Int, 
+    val from: Int,
     /**
      * Contains the distance set by the source to be able to receive its messages.
     */
@@ -30,45 +30,56 @@ data class SourceDistances(
      * Is a boolean value indicating whether the identified messaging distance has been
      * communicated by a source node.
     */
-    val isSourceValues: Boolean 
+    val isSourceValues: Boolean
 )
 
 /**
- * Saves and processes new message information based on devices and their positions.
+ * Extracts and validates message propagation data based on neighboring devices and spatial relationships.
  *
- * This function analyzes neighboring devices and calculates the alignment of distances
- * between the current node and others using the Euclidean distance metric in 3D space.
- * For each neighboring device, it creates a list of [SourceDistances] representing
- * the relationship between sender and receiver nodes, including distance metrics
- * and whether the message source is valid.
+ * This function analyzes neighboring devices by computing the Euclidean distance from the current node
+ * to each neighbor. It then produces a list of [SourceDistances] for each neighbor, capturing:
+ * - the sender (source) ID,
+ * - the receiver (current node) ID,
+ * - the intended transmission radius (`distanceForMessaging`),
+ * - the actual distance between the nodes,
+ * - and a boolean flag (`isSourceValues`) indicating whether a valid message from a known sender
+ *   is available for the current node.
  *
- * The resulting map is filtered to only include entries where the sender is known
- * (contained in [senders]) and excludes the current node itself. For each device,
- * only entries flagged as valid sources (`isSourceValues`) and matching the device ID
- * are retained.
+ * The [senders] parameter must include the `sourceCounter` as part of its triple to track multiple emissions
+ * from the same sender. However, this function currently uses only the sender ID to validate
+ * message availability and does not explicitly process the `sourceCounter` in its logic.
  *
- * @param devices A map of device IDs to float values representing distances or metrics used in neighbor detection.
- * @param position The 3D position of the current node.
- * @param senders A map of sender device IDs to pairs of accumulated distance and message string.
+ * After processing, the resulting map is filtered to retain only entries:
+ * - where the sender is present in [senders],
+ * - where the sender is not the current node (`localId`),
+ * - and where `isSourceValues` is `true` and the `to` field matches the sender ID.
  *
- * @return A filtered map where keys are sender device IDs and values are lists of [SourceDistances]
- * that represent valid message propagation data for that sender.
+ * @param devices A map associating device IDs with float values (usually distance metrics),
+ *                used to determine which neighbors are within communication range.
+ * @param position The 3D spatial position of the current node, used for distance evaluation.
+ * @param senders A map of sender node IDs to a [Triple] of:
+ *                - the sender’s propagation distance,
+ *                - the message string,
+ *                - the `sourceCounter` (number of emission events from that sender).
+ *
+ * @return A filtered map where each key is a valid sender ID and the value is a list of
+ *         [SourceDistances] representing confirmed message propagation to the current node.
  */
 fun Aggregate<Int>.saveNewMessage(
     devices:  Map<Int, Float>,
     position: Point3D,
-    senders: Map<Int, Pair<Float, String>>,
+    senders: Map<Int, Triple<Float, String, Int>>,
 ) : Map<Int, List<SourceDistances>> {
     return neighboring(devices).alignedMap(euclideanDistance3D(position)) {
         _: Int, deviceValues: Map<Int, Float>, distance: Double ->
         deviceValues.entries.map { (to, distanceForMessaging) ->
             SourceDistances(
-                to, 
+                to,
                 localId,
                 distanceForMessaging,
                 distance,
                 senders.containsKey(to) &&
-                distanceForMessaging != POSITIVE_INFINITY && 
+                distanceForMessaging != POSITIVE_INFINITY &&
                 to != localId
             )
         }

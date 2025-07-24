@@ -6,17 +6,17 @@
     "red": {
       "max": 255,
       "min": 0,
-      "val": 0
+      "val": 33
     },
     "blue": {
       "max": 255,
       "min": 0,
-      "val": 0
+      "val": 82
     },
     "green": {
       "max": 255,
       "min": 0,
-      "val": 0
+      "val": 144
     },
     "alpha": {
       "max": 255,
@@ -34,7 +34,7 @@
       "val": 11
     },
     "molFilter": true,
-    "molString": "isSource",
+    "molString": "it.unibo.collektive.examples.geoChat.GeoChatKt.geoChatEntrypoint",
     "molPropertyFilter": true,
     "property": "",
     "writingPropertyValue": true,
@@ -56,7 +56,7 @@
       "val": 10
     },
     "colorCache": {
-      "value": -16711936
+      "value": -16755036
     }
   }
 ]
