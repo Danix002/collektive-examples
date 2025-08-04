@@ -1,7 +1,7 @@
 [versions]
-alchemist = "42.2.7"
-collektive = "25.0.1"
-kotlin = "2.1.21"
+alchemist = "42.2.8"
+collektive = "26.0.0"
+kotlin = "2.2.0"
 kotlin-logging = "7.0.7"
 
 [libraries]
@@ -18,9 +18,9 @@ alchemist = ["alchemist", "alchemist-euclidean-geometry", "alchemist-incarnation
 collektive = ["collektive", "collektive-incarnation", "collektive-stdlib"]
 
 [plugins]
-multiJvmTesting = "org.danilopianini.multi-jvm-test-plugin:3.5.1"
+multiJvmTesting = "org.danilopianini.multi-jvm-test-plugin:3.6.0"
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
-kotlin-qa = "org.danilopianini.gradle-kotlin-qa:0.89.1"
+kotlin-qa = "org.danilopianini.gradle-kotlin-qa:0.93.0"
 taskTree = "com.dorongold.task-tree:4.0.1"
 collektive = { id = "it.unibo.collektive.collektive-plugin", version.ref = "collektive" }
