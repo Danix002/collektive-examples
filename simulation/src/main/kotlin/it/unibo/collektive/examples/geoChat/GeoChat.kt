@@ -7,13 +7,21 @@ import it.unibo.alchemist.model.Environment
 import it.unibo.alchemist.model.Node
 import it.unibo.alchemist.model.Position
 import it.unibo.collektive.aggregate.api.neighboring
+import it.unibo.collektive.aggregate.api.share
 import it.unibo.collektive.examples.geoChat.utils.MessageKey
+import it.unibo.collektive.examples.geoChat.utils.SourceDistances
 import it.unibo.collektive.examples.geoChat.utils.getListOfDevicesValues
 import it.unibo.collektive.examples.geoChat.utils.saveNewMessage
 import it.unibo.collektive.examples.geoChat.utils.receivedMessageList
 import it.unibo.collektive.examples.geoChat.utils.spreadIntentionToSendMessage
 import it.unibo.collektive.examples.geoChat.utils.spreadNewMessage
+import it.unibo.collektive.stdlib.maps.FieldedMaps.values
+import it.unibo.collektive.stdlib.maps.FieldedMapsExtensions.filterValues
 import kotlin.Float.Companion.POSITIVE_INFINITY
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.filterValues
+import kotlin.collections.isNotEmpty
 import kotlin.random.Random
 
 /**
@@ -139,30 +147,25 @@ fun Aggregate<Int>.geoChatEntrypoint(
         tmp.putAll(allSender.values)
         senders = tmp
     }
-    var newMessages = saveNewMessage(getListOfDevicesValues(senders), position, senders)
-    simulatedDevice["incomingMessagesFromNeighbors"] = newMessages
-    /**
-     * The dissemination occurs correctly; however, the storage mechanism encounters issues when
-     * two devices are not directly connected. This is due to the reliance on the 'neighboring' function.
-     * A later post-dissemination step for message storage should be implemented similarly.
-     */
-    val updateNewMessages = newMessages.mapValues { it.value.toMutableList() }.toMutableMap()
-    newMessages.values.forEach { messageList ->
-        messageList.forEach { message ->
-            val res = alignedOn(message.to) {
-                spreadNewMessage(
-                    incomingMessage = message,
-                    from = true,
-                    position = position
-                )
-            }
-            if(res.distance != Double.MAX_VALUE && !updateNewMessages.containsKey(res.to)){
-                updateNewMessages.getOrPut(res.to) { mutableListOf() }.add(res)
+    val newMessages = saveNewMessage(getListOfDevicesValues(senders), position, senders).mapValues { it.value.toMutableList() }.toMutableMap()
+    val updateNewMessages = spreadNewMessage(
+        incomingMessages = newMessages,
+        from = newMessages.isNotEmpty(),
+        position = position
+    )
+    updateNewMessages.forEach { (_, messagesFromOthers) ->
+        messagesFromOthers.forEach { (key, list) ->
+            val currentList = newMessages.getOrPut(key) { mutableListOf() }
+            list.forEach { msg ->
+                val existing = currentList.find { it.from == msg.from && it.to == msg.to }
+                if (existing == null) {
+                    currentList.removeIf { it.from == msg.from && it.to == msg.to }
+                    currentList.add(msg)
+                }
             }
         }
     }
-    newMessages = updateNewMessages
-    simulatedDevice["incomingMessagesFromOthers"] = updateNewMessages.filterKeys { !newMessages.keys.toList().contains(it) }
+    simulatedDevice["incomingMessages"] = newMessages
     //============ Save messages
     val messageKeys = receivedMessageList(newMessages)
     val receivedMessages = (
@@ -186,7 +189,6 @@ fun Aggregate<Int>.geoChatEntrypoint(
             }
         }
     }
-
     simulatedDevice["messagesReceived"] = receivedMessages
     simulatedDevice["messageHistory"] = ordered
     return receivedMessages.size

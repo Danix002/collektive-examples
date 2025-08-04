@@ -1,6 +1,6 @@
 network-model:
   type: ConnectWithinDistance
-  parameters: [15]
+  parameters: [10]
 
 incarnation: collektive
 

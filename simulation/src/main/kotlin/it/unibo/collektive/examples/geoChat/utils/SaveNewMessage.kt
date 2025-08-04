@@ -3,9 +3,12 @@ package it.unibo.collektive.examples.geoChat.utils
 import it.unibo.collektive.aggregate.api.Aggregate
 import kotlin.Float.Companion.POSITIVE_INFINITY
 import it.unibo.collektive.aggregate.api.neighboring
-import it.unibo.collektive.stdlib.spreading.gradientCast
+import it.unibo.collektive.aggregate.api.share
+import it.unibo.collektive.stdlib.fields.fold
+import it.unibo.collektive.stdlib.spreading.multiGradientCast
 import it.unibo.collektive.stdlib.util.Point3D
 import it.unibo.collektive.stdlib.util.euclideanDistance3D
+import kotlin.collections.mapValues
 
 /**
  * Data class representing the distances from a source device to another non-source device.
@@ -91,39 +94,60 @@ fun Aggregate<Int>.saveNewMessage(
         }
 }
 
+
 /**
- * The dissemination occurs correctly; however, the storage mechanism encounters issues when
- * two devices are not directly connected. This is due to the reliance on the 'neighboring' function.
- * A later post-dissemination step for message storage should be implemented similarly.
+ * Propagates received messages from neighboring nodes using a multi-source gradient,
+ * updating the distances and forwarding only messages within the allowed communication radius.
+ *
+ * This function relies on `multiGradientCast` to perform a distance-based diffusion from
+ * multiple sources, leveraging a 3D Euclidean distance metric. The propagation is constrained
+ * by each message's `distanceForMessaging`, ensuring that messages do not spread beyond
+ * their intended range.
+ *
+ * @param incomingMessages a map where each key is a source node ID (`Int`), and the corresponding
+ *        value is a list of [SourceDistances] representing messages received from that source.
+ * @param from a boolean indicating whether the current node is an active message source
+ *        in this round. If `true`, the node will be included in the shared source set.
+ * @param position the current 3D position of the local node, used to compute distance to neighbors.
+ *
+ * @return a nested map where the outer keys are neighbor node IDs (`Int`), and the values
+ *         are maps associating each message source ID to a filtered list of [SourceDistances].
+ *         Each message is updated with the cumulative distance and the current node's ID
+ *         as the new intermediate sender (`from`). Messages that exceed their allowed
+ *         `distanceForMessaging` are discarded.
+ *
+ * The returned map excludes empty lists, keeping only meaningful propagated data.
  */
 fun Aggregate<Int>.spreadNewMessage(
-    incomingMessage: SourceDistances,
+    incomingMessages: Map<Int, List<SourceDistances>>,
     from: Boolean,
     position: Point3D
-) : SourceDistances {
-    return gradientCast(
-        source = from,
-        local = incomingMessage,
+) : Map<Int, Map<Int, List<SourceDistances>>> {
+    val sources = share(emptySet()) { neighborSources ->
+        neighborSources.fold(emptySet()) { accumulated, neighborSet ->
+            accumulated union neighborSet.value
+        }.let { collected ->
+            if (from) collected + localId else collected
+        }
+    }
+
+    return multiGradientCast(
+        sources = sources,
+        local = incomingMessages,
         metric = euclideanDistance3D(position),
         accumulateData = { fromSource, toNeighbor, value ->
-            val totalDistance = fromSource + toNeighbor + value.distance
-            if (totalDistance <= value.distanceForMessaging.toDouble()) {
-                SourceDistances(
-                    value.to,
-                    value.from,
-                    value.distanceForMessaging,
-                    totalDistance,
-                    true
-                )
-            } else {
-                SourceDistances(
-                    localId,
-                    localId,
-                    Float.MAX_VALUE,
-                    Double.MAX_VALUE,
-                    false
-                )
-            }
-        }
+            value.mapValues { (_, list) ->
+                list.mapNotNull {
+                    val totalDistance = it.distance + fromSource + toNeighbor
+                    if (totalDistance <= it.distanceForMessaging) {
+                        it.copy(from = localId, distance = totalDistance)
+                    } else {
+                        null
+                    }
+                }
+            }.filterValues { it.isNotEmpty() }
+        },
     )
+        .filterKeys { it != localId }
+        .filterValues { it.isNotEmpty() }
 }
