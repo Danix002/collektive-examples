@@ -12,6 +12,7 @@ import it.unibo.collektive.examples.geoChat.utils.getListOfDevicesValues
 import it.unibo.collektive.examples.geoChat.utils.saveNewMessage
 import it.unibo.collektive.examples.geoChat.utils.receivedMessageList
 import it.unibo.collektive.examples.geoChat.utils.spreadIntentionToSendMessage
+import it.unibo.collektive.examples.geoChat.utils.spreadNewMessage
 import kotlin.Float.Companion.POSITIVE_INFINITY
 import kotlin.random.Random
 
@@ -74,8 +75,8 @@ fun isSource() = Random.nextFloat() < 0.25f
  * @return The number of unique messages received by the device up to the current simulation time.
  *
  * @implNote
- * A node that becomes a message source retains this role for a minimum of 30 seconds,
- * after which it is prevented from becoming a source again for another 30 seconds.
+ * A node that becomes a message source retains this role for a minimum of 15 seconds,
+ * after which it is prevented from becoming a source again for another 15 seconds.
  *
  * Messages are associated with a unique emission counter (`sourceCounter`) that is incremented
  * upon each emission. This mechanism ensures that distinct messages from the same source node
@@ -95,12 +96,12 @@ fun Aggregate<Int>.geoChatEntrypoint(
     val lastAttempt = simulatedDevice["lastAttempt"] as? Long ?: 0L
     val lastSourceStart = simulatedDevice["sourceSince"] as? Long ?: -1L
     val wasSource = simulatedDevice["isSource"] as? Boolean ?: false
-    val inCooldown = now - lastAttempt < 30_000
+    val inCooldown = now - lastAttempt < 15_000
     val isSource = when {
-        wasSource && (now - lastSourceStart < 30_000) -> true
+        wasSource && (now - lastSourceStart < 15_000) -> true
         !inCooldown && isSource() -> {
             val msg = "Hello! I'm device $localId"
-            val dist = Random.nextInt(5, 20).toFloat()
+            val dist = Random.nextInt(15, 50).toFloat()
             sourceCounter = (simulatedDevice["sourceCounter"] as? Int ?: 0) + 1
             simulatedDevice["sourceCounter"] = sourceCounter
             simulatedDevice["isSource"] = true
@@ -138,7 +139,30 @@ fun Aggregate<Int>.geoChatEntrypoint(
         tmp.putAll(allSender.values)
         senders = tmp
     }
-    val newMessages = saveNewMessage(getListOfDevicesValues(senders), position, senders)
+    var newMessages = saveNewMessage(getListOfDevicesValues(senders), position, senders)
+    simulatedDevice["incomingMessagesFromNeighbors"] = newMessages
+    /**
+     * The dissemination occurs correctly; however, the storage mechanism encounters issues when
+     * two devices are not directly connected. This is due to the reliance on the 'neighboring' function.
+     * A later post-dissemination step for message storage should be implemented similarly.
+     */
+    val updateNewMessages = newMessages.mapValues { it.value.toMutableList() }.toMutableMap()
+    newMessages.values.forEach { messageList ->
+        messageList.forEach { message ->
+            val res = alignedOn(message.to) {
+                spreadNewMessage(
+                    incomingMessage = message,
+                    from = true,
+                    position = position
+                )
+            }
+            if(res.distance != Double.MAX_VALUE && !updateNewMessages.containsKey(res.to)){
+                updateNewMessages.getOrPut(res.to) { mutableListOf() }.add(res)
+            }
+        }
+    }
+    newMessages = updateNewMessages
+    simulatedDevice["incomingMessagesFromOthers"] = updateNewMessages.filterKeys { !newMessages.keys.toList().contains(it) }
     //============ Save messages
     val messageKeys = receivedMessageList(newMessages)
     val receivedMessages = (

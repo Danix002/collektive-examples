@@ -3,6 +3,7 @@ package it.unibo.collektive.examples.geoChat.utils
 import it.unibo.collektive.aggregate.api.Aggregate
 import kotlin.Float.Companion.POSITIVE_INFINITY
 import it.unibo.collektive.aggregate.api.neighboring
+import it.unibo.collektive.stdlib.spreading.gradientCast
 import it.unibo.collektive.stdlib.util.Point3D
 import it.unibo.collektive.stdlib.util.euclideanDistance3D
 
@@ -88,4 +89,41 @@ fun Aggregate<Int>.saveNewMessage(
         .mapValues { (key, list) ->
             list.filter { it.isSourceValues && it.distance <= it.distanceForMessaging && it.to == key}
         }
+}
+
+/**
+ * The dissemination occurs correctly; however, the storage mechanism encounters issues when
+ * two devices are not directly connected. This is due to the reliance on the 'neighboring' function.
+ * A later post-dissemination step for message storage should be implemented similarly.
+ */
+fun Aggregate<Int>.spreadNewMessage(
+    incomingMessage: SourceDistances,
+    from: Boolean,
+    position: Point3D
+) : SourceDistances {
+    return gradientCast(
+        source = from,
+        local = incomingMessage,
+        metric = euclideanDistance3D(position),
+        accumulateData = { fromSource, toNeighbor, value ->
+            val totalDistance = fromSource + toNeighbor + value.distance
+            if (totalDistance <= value.distanceForMessaging.toDouble()) {
+                SourceDistances(
+                    value.to,
+                    value.from,
+                    value.distanceForMessaging,
+                    totalDistance,
+                    true
+                )
+            } else {
+                SourceDistances(
+                    localId,
+                    localId,
+                    Float.MAX_VALUE,
+                    Double.MAX_VALUE,
+                    false
+                )
+            }
+        }
+    )
 }
