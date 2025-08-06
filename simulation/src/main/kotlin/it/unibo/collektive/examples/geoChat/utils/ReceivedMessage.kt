@@ -27,7 +27,7 @@ fun Aggregate<Int>.receivedMessageList(
     senders: Map<Int, List<SourceDistances>>
 ): Map<Int, List<Pair<Int, Boolean>>> = mapNeighborhood{ _ ->
     senders.entries.mapNotNull { (id, distance) ->
-        val entry = distance.find { it.to == id && it.from == localId }
+        val entry = distance.find { it.sender == id && it.receiver == localId }
         entry?.let { id to true }
     }
 }.toMap().filterKeys { it == localId }

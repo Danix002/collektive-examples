@@ -17,19 +17,19 @@ data class SourceDistances(
     /**
      * Contains the id of the source node being considered.
     */
-    val to: Int, 
+    val sender: Int,
     /**
      * Contains the id of the non-source node being considered.
     */
-    val from: Int,
+    val receiver: Int,
     /**
      * Contains the distance set by the source to be able to receive its messages.
     */
     val distanceForMessaging: Float,
     /**
-     * Contains the distance between node in [to] value and node in [from] value.
+     * Contains the distance between node in [sender] value and node in [receiver] value.
     */
-    val distance: Double, 
+    val distance: Double,
     /**
      * Is a boolean value indicating whether the identified messaging distance has been
      * communicated by a source node.
@@ -90,7 +90,7 @@ fun Aggregate<Int>.saveNewMessage(
     }.toMap()
         .filterKeys { senders.containsKey(it) && it != localId }
         .mapValues { (key, list) ->
-            list.filter { it.isSourceValues && it.distance <= it.distanceForMessaging && it.to == key}
+            list.filter { it.isSourceValues && it.distance <= it.distanceForMessaging && it.sender == key}
         }
 }
 
@@ -140,11 +140,11 @@ fun Aggregate<Int>.spreadNewMessage(
                 list.mapNotNull {
                     val totalDistance = it.distance + fromSource + toNeighbor
                     if (totalDistance <= it.distanceForMessaging) {
-                        it.copy(from = localId, distance = totalDistance)
+                        it.copy(receiver = localId, distance = totalDistance)
                     } else {
                         null
                     }
-                }
+                }.filter { it.sender != localId }
             }.filterValues { it.isNotEmpty() }
         },
     )
