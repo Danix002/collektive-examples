@@ -45,9 +45,9 @@ fun Aggregate<Int>.spreadIntentionToSendMessage(
         source = isSender,
         local = deviceId to Triple(distance, message, sourceCounter),
         metric = euclideanDistance3D(position),
-        accumulateData = { fromSource, toNeighbor, dist ->
+        accumulateData = { fromSource, toNeighbor, metadata ->
             if (fromSource + toNeighbor <= distance.toDouble()) {
-                dist
+                metadata
             } else {
                 deviceId to Triple(POSITIVE_INFINITY, "", -1)
             }

@@ -31,13 +31,13 @@ import it.unibo.collektive.aggregate.api.mapNeighborhood
  */
 fun Aggregate<Int>.getListOfDevicesValues(
     senders: Map<Int, Triple<Float, String, Int>>
-): Map<Int, Float> {
+): Map<Int, Triple<Float, String, Int>> {
     val neighborhoodMap = mapNeighborhood { id ->
-        senders[id]?.first ?: POSITIVE_INFINITY
+        senders[id] ?: Triple(POSITIVE_INFINITY, "", -1)
     }.toMap()
-    val combined = mutableMapOf<Int, Float>()
+    val combined = mutableMapOf<Int, Triple<Float, String, Int>>()
     for ((id, triple) in senders) {
-        combined[id] = triple.first
+        combined[id] = triple
     }
     combined.putAll(neighborhoodMap)
     return combined

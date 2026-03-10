@@ -23,6 +23,10 @@ data class SourceDistances(
     */
     val receiver: Int,
     /**
+     * Message payload
+     */
+    val text: String,
+    /**
      * Contains the distance set by the source to be able to receive its messages.
     */
     val distanceForMessaging: Float,
@@ -30,6 +34,11 @@ data class SourceDistances(
      * Contains the distance between node in [sender] value and node in [receiver] value.
     */
     val distance: Double,
+    /**
+     * An incremental counter that identifies the specific emission sequence of messages
+     * originating from the source node.
+    */
+    val sourceCount: Int,
     /**
      * Is a boolean value indicating whether the identified messaging distance has been
      * communicated by a source node.
@@ -70,20 +79,22 @@ data class SourceDistances(
  *         [SourceDistances] representing confirmed message propagation to the current node.
  */
 fun Aggregate<Int>.saveNewMessage(
-    devices:  Map<Int, Float>,
+    devices:  Map<Int, Triple<Float, String, Int>>,
     position: Point3D,
     senders: Map<Int, Triple<Float, String, Int>>,
 ) : Map<Int, List<SourceDistances>> {
     return neighboring(devices).alignedMap(euclideanDistance3D(position)) {
-        _: Int, deviceValues: Map<Int, Float>, distance: Double ->
-        deviceValues.entries.map { (to, distanceForMessaging) ->
+        id: Int, deviceValues: Map<Int, Triple<Float, String, Int>>, distance: Double ->
+        deviceValues.entries.map { (to, metadata) ->
             SourceDistances(
                 to,
                 localId,
-                distanceForMessaging,
+                metadata.second,
+                metadata.first,
                 distance,
+                metadata.third,
                 senders.containsKey(to) &&
-                distanceForMessaging != POSITIVE_INFINITY &&
+                metadata.first != POSITIVE_INFINITY &&
                 to != localId
             )
         }

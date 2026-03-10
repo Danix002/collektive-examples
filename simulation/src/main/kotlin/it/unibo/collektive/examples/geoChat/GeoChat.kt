@@ -94,19 +94,20 @@ fun Aggregate<Int>.geoChatEntrypoint(
     simulatedDevice: CollektiveDevice<*>,
 ): Int {
     //============ Setup
-    var distance = POSITIVE_INFINITY; var message = ""; var senders = emptyMap<Int, Triple<Float, String, Int>>(); var sourceCounter = 0;
+    var distance = POSITIVE_INFINITY; var message = ""; var senders = emptyMap<Int, Triple<Float, String, Int>>()
     val position = generateRandomPoint3D(simulatedDevice.environment, simulatedDevice.node)
     val now = System.currentTimeMillis()
     val lastAttempt = simulatedDevice["lastAttempt"] as? Long ?: 0L
     val lastSourceStart = simulatedDevice["sourceSince"] as? Long ?: -1L
     val wasSource = simulatedDevice["isSource"] as? Boolean ?: false
+    var sourceCounter = simulatedDevice["sourceCounter"] as? Int ?: 0
     val inCooldown = now - lastAttempt < 15_000
     val isSource = when {
         wasSource && (now - lastSourceStart < 15_000) -> true
         !inCooldown && isSource() -> {
             val msg = "Hello! I'm device $localId"
             val dist = Random.nextInt(15, 50).toFloat()
-            sourceCounter = (simulatedDevice["sourceCounter"] as? Int ?: 0) + 1
+            sourceCounter += 1
             simulatedDevice["sourceCounter"] = sourceCounter
             simulatedDevice["isSource"] = true
             simulatedDevice["sourceSince"] = now
@@ -143,7 +144,11 @@ fun Aggregate<Int>.geoChatEntrypoint(
         tmp.putAll(allSender.values)
         senders = tmp
     }
-    val newMessages = saveNewMessage(getListOfDevicesValues(senders), position, senders).mapValues { it.value.toMutableList() }.toMutableMap()
+    val newMessages = saveNewMessage(
+        getListOfDevicesValues(senders),
+        position,
+        senders
+    ).mapValues { it.value.toMutableList() }.toMutableMap()
     val updateNewMessages = spreadNewMessage(
         incomingMessages = newMessages,
         from = newMessages.isNotEmpty(),
@@ -170,10 +175,9 @@ fun Aggregate<Int>.geoChatEntrypoint(
             ?: mutableListOf()
         ).toMutableList()
     for ((senderId, list) in messageKeys) {
-        for ((key, received) in list) {
+        for ((key, received, value) in list) {
             if (received) {
-                val triple = senders[key] ?: continue
-                val (dist, content, counter) = triple
+                val (dist, content, counter) = value
                 val mKey = MessageKey(senderId = key, emission = counter)
                 if (counter > 0 && !receivedMessages.containsKey(mKey)) {
                     receivedMessages[mKey] = dist to content

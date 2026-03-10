@@ -25,9 +25,15 @@ data class MessageKey(val senderId: Int, val emission: Int)
  */
 fun Aggregate<Int>.receivedMessageList(
     senders: Map<Int, List<SourceDistances>>
-): Map<Int, List<Pair<Int, Boolean>>> = mapNeighborhood{ _ ->
+): Map<Int, List<Triple<Int, Boolean, Triple<Float, String, Int>>>> = mapNeighborhood{ _ ->
     senders.entries.mapNotNull { (id, distance) ->
         val entry = distance.find { it.sender == id && it.receiver == localId }
-        entry?.let { id to true }
+        entry?.let {
+            Triple(
+                id,
+                true,
+                Triple(it.distanceForMessaging, it.text, it.sourceCount)
+            )
+        }
     }
 }.toMap().filterKeys { it == localId }
