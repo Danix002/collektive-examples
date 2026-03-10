@@ -26,8 +26,9 @@ import it.unibo.collektive.aggregate.api.mapNeighborhood
  *   2. The message content,
  *   3. The number of times the sender has acted as a source (`sourceCounter`).
  *
- * @return A map where each neighbor ID is associated with its message broadcast distance.
- *         Devices not included in [senders] are assigned [POSITIVE_INFINITY].
+ * @return A unified map associating each relevant device ID with its [Triple] of distance,
+ * content, and sequence counter. Neighbors not acting as sources are assigned
+ * [POSITIVE_INFINITY] distance.
  */
 fun Aggregate<Int>.getListOfDevicesValues(
     senders: Map<Int, Triple<Float, String, Int>>
@@ -42,4 +43,3 @@ fun Aggregate<Int>.getListOfDevicesValues(
     combined.putAll(neighborhoodMap)
     return combined
 }
-

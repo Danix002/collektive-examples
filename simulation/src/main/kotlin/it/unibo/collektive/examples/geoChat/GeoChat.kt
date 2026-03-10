@@ -78,17 +78,6 @@ fun isSource() = Random.nextFloat() < 0.25f
  *
  * @return The number of unique messages received by the device up to the current simulation time.
  *
- * @implNote
- * A node that becomes a message source retains this role for a minimum of 15 seconds,
- * after which it is prevented from becoming a source again for another 15 seconds.
- *
- * Messages are associated with a unique emission counter (`sourceCounter`) that is incremented
- * upon each emission. This mechanism ensures that distinct messages from the same source node
- * are uniquely identifiable and persistently recorded using [MessageKey].
- *
- * Only messages with an emission counter strictly greater than zero are stored and visualized.
- * The complete history of received messages is maintained in `messagesReceived` (for uniqueness)
- * and `messageHistory` (to preserve temporal reception order).
  */
 fun Aggregate<Int>.geoChatEntrypoint(
     simulatedDevice: CollektiveDevice<*>,

@@ -19,9 +19,8 @@ data class MessageKey(val senderId: Int, val emission: Int)
  * @param senders A map where keys are sender IDs and values are lists of SourceDistances,
  * representing distances between nodes related to message propagation.
  *
- * @return A map from device IDs to lists of pairs, each containing a sender ID and
- * a Boolean indicating whether the message was effectively received (true if
- * distanceForMessaging >= distance).
+ * @return A filtered map where the localId is associated with a list of a
+ * received messages and their corresponding metadata.
  */
 fun Aggregate<Int>.receivedMessageList(
     senders: Map<Int, List<SourceDistances>>

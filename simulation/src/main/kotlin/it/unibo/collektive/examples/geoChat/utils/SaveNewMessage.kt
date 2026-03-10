@@ -47,36 +47,32 @@ data class SourceDistances(
 )
 
 /**
- * Extracts and validates message propagation data based on neighboring devices and spatial relationships.
+ * Synchronizes and validates spatial message propagation by aligning neighborhood metadata
+ * with computed Euclidean distances.
  *
- * This function analyzes neighboring devices by computing the Euclidean distance from the current node
- * to each neighbor. It then produces a list of [SourceDistances] for each neighbor, capturing:
- * - the sender (source) ID,
- * - the receiver (current node) ID,
- * - the intended transmission radius (`distanceForMessaging`),
- * - the actual distance between the nodes,
- * - and a boolean flag (`isSourceValues`) indicating whether a valid message from a known sender
- *   is available for the current node.
+ * This function leverages the alignedMap construct to perform a coordinated computation
+ * across the neighborhood. It calculates the 3D distance between the localId and each
+ * neighbor while simultaneously unpacking the metadata provided by those neighbors.
  *
- * The [senders] parameter must include the `sourceCounter` as part of its triple to track multiple emissions
- * from the same sender. However, this function currently uses only the sender ID to validate
- * message availability and does not explicitly process the `sourceCounter` in its logic.
+ * Each neighbor's state in [devices] is expected to be a [Triple] containing:
+ * 1. **Messaging Radius** ([Float]): The maximum distance at which the source's message remains valid.
+ * 2. **Payload** ([String]): The actual text content of the message.
+ * 3. **Emission Counter** ([Int]): The sourceCount identifying the specific message version.
  *
- * After processing, the resulting map is filtered to retain only entries:
- * - where the sender is present in [senders],
- * - where the sender is not the current node (`localId`),
- * - and where `isSourceValues` is `true` and the `to` field matches the sender ID.
+ * The function produces a [SourceDistances] record for each neighbor-to-neighbor relationship,
+ * which is then strictly filtered based on the following criteria:
+ * - **Identity**: The sender must be a recognized source in the [senders] map and cannot be the localId.
+ * - **Spatial Validity**: The computed Euclidean distance must be less than or equal to the
+ * broadcast radius (distanceForMessaging) defined by the source.
+ * - **Source Integrity**: The isSourceValues flag must be true, ensuring the data originates
+ * from a valid communication branch.
  *
- * @param devices A map associating device IDs with float values (usually distance metrics),
- *                used to determine which neighbors are within communication range.
- * @param position The 3D spatial position of the current node, used for distance evaluation.
- * @param senders A map of sender node IDs to a [Triple] of:
- *                - the sender’s propagation distance,
- *                - the message string,
- *                - the `sourceCounter` (number of emission events from that sender).
+ * @param devices A field-aligned map of neighboring devices and their associated [Triple] metadata.
+ * @param position The current 3D coordinates of this node, used to compute [euclideanDistance3D].
+ * @param senders A reference map of active message sources used for validation and filtering.
  *
- * @return A filtered map where each key is a valid sender ID and the value is a list of
- *         [SourceDistances] representing confirmed message propagation to the current node.
+ * @return A map associating each valid neighbor ID with a list of [SourceDistances] that
+ * satisfy both spatial proximity and protocol constraints.
  */
 fun Aggregate<Int>.saveNewMessage(
     devices:  Map<Int, Triple<Float, String, Int>>,
@@ -104,7 +100,6 @@ fun Aggregate<Int>.saveNewMessage(
             list.filter { it.isSourceValues && it.distance <= it.distanceForMessaging && it.sender == key}
         }
 }
-
 
 /**
  * Propagates received messages from neighboring nodes using a multi-source gradient,
