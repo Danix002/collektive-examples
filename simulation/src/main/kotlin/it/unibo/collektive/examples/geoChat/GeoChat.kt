@@ -159,10 +159,6 @@ fun Aggregate<Int>.geoChatEntrypoint(
         simulatedDevice["messagesReceived"] as? MutableMap<MessageKey, Pair<Float, String>>
             ?: mutableMapOf()
         ).toMutableMap()
-    val ordered = (
-        simulatedDevice["messageHistory"] as? MutableList<Pair<MessageKey, String>>
-            ?: mutableListOf()
-        ).toMutableList()
     for ((senderId, list) in messageKeys) {
         for ((key, received, value) in list) {
             if (received) {
@@ -170,13 +166,11 @@ fun Aggregate<Int>.geoChatEntrypoint(
                 val mKey = MessageKey(senderId = key, emission = counter)
                 if (counter > 0 && !receivedMessages.containsKey(mKey)) {
                     receivedMessages[mKey] = dist to content
-                    ordered += mKey to content
                 }
             }
         }
     }
     simulatedDevice["messagesReceived"] = receivedMessages
-    simulatedDevice["messageHistory"] = ordered
     return receivedMessages.size
 }
 
