@@ -129,8 +129,8 @@ fun Aggregate<Int>.geoChatEntrypoint(
     //============ Receive messages
     if(sender.second.first != POSITIVE_INFINITY){
         val tmp = senders.toMutableMap()
-        val allSender = neighboring(sender).toMap()
-        tmp.putAll(allSender.values)
+        val allSenders = neighboring(sender).toMap()
+        tmp.putAll(allSenders.values)
         senders = tmp
     }
     val newMessages = saveNewMessage(
@@ -146,10 +146,10 @@ fun Aggregate<Int>.geoChatEntrypoint(
     updateNewMessages.forEach { (_, messagesFromOthers) ->
         messagesFromOthers.forEach { (key, list) ->
             val currentList = newMessages.getOrPut(key) { mutableListOf() }
-            val newMessages = list.filter { newMsg ->
+            val tmpNewMessages = list.filter { newMsg ->
                 currentList.none { existing -> existing.isSameMessage(newMsg) }
             }
-            currentList.addAll(newMessages)
+            currentList.addAll(tmpNewMessages)
         }
     }
     simulatedDevice["incomingMessages"] = newMessages

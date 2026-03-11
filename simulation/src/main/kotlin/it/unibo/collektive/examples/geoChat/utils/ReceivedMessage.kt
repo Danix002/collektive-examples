@@ -16,23 +16,23 @@ data class MessageKey(val senderId: Int, val emission: Int)
  *
  * The result is filtered to only include entries relevant to the current node.
  *
- * @param senders A map where keys are sender IDs and values are lists of SourceDistances,
+ * @param newMessages A map where keys are sender IDs and values are lists of SourceDistances,
  * representing distances between nodes related to message propagation.
  *
  * @return A filtered map where the localId is associated with a list of a
  * received messages and their corresponding metadata.
  */
 fun Aggregate<Int>.receivedMessageList(
-    senders: Map<Int, List<SourceDistances>>
+    newMessages: Map<Int, List<SourceDistances>>
 ): Map<Int, List<Triple<Int, Boolean, Triple<Float, String, Int>>>> = mapNeighborhood{ _ ->
-    senders.entries.mapNotNull { (id, distance) ->
-        val entry = distance.find { it.sender == id && it.receiver == localId }
-        entry?.let {
-            Triple(
-                id,
-                true,
-                Triple(it.distanceForMessaging, it.text, it.sourceCount)
-            )
-        }
+    newMessages.entries.flatMap { (id, data) ->
+        data.filter { it.receiver == localId }
+            .map { entry ->
+                Triple(
+                    id,
+                    true,
+                    Triple(entry.distanceForMessaging, entry.text, entry.sourceCount)
+                )
+            }
     }
 }.toMap().filterKeys { it == localId }
